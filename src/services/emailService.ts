@@ -27,8 +27,27 @@ export class EmailService {
   }
 
   private static async logEmailAttempt(customerId: string, email: string, status: 'sent' | 'failed', error?: string) {
-    // Log to console for now - can be enhanced later with proper logging table
-    console.log(`Email ${status} for customer ${customerId} (${email})`, error ? `Error: ${error}` : '');
+    try {
+      // Log to database
+      const { error: logError } = await supabase.from('email_logs').insert({
+        customer_id: customerId,
+        email_address: email,
+        status,
+        error_message: error,
+        sent_at: new Date().toISOString(),
+      });
+      
+      if (logError) {
+        console.error('Failed to log email attempt to database:', logError);
+        if (logError.message?.includes('email_logs')) {
+          console.warn('⚠️ Email logs table not found. Please run the database migration.');
+        }
+      }
+      
+      console.log(`📧 Email ${status} for customer ${customerId} (${email})`, error ? `Error: ${error}` : '');
+    } catch (logError) {
+      console.error('Failed to log email attempt:', logError);
+    }
   }
 
   private static async sendEmailWithRetry(emailParams: EmailParams, attempts = 0): Promise<boolean> {
@@ -125,13 +144,17 @@ export class EmailService {
   }
 
   static async sendWelcomeEmail(customerData: { id: string; name: string; email: string }): Promise<boolean> {
+    console.log('🚀 Starting sendWelcomeEmail for:', customerData);
+    
     try {
       // Check if email service is configured
       if (!this.isConfigured()) {
-        console.warn('Email service not configured. Skipping email send.');
+        console.warn('❌ Email service not configured. Skipping email send.');
         await this.logEmailAttempt(customerData.id, customerData.email, 'failed', 'Email service not configured');
         return false;
       }
+      
+      console.log('✅ Email service is configured');
 
       // Always send direct portal link - password setup will be handled in the portal
       const setupLink = `${window.location.origin}/customer-portal/login?email=${encodeURIComponent(customerData.email)}`;
@@ -145,25 +168,53 @@ export class EmailService {
         login_link: setupLink,
       };
 
-      console.log('Sending welcome email to:', customerData.email);
+      console.log('📧 Sending welcome email to:', customerData.email);
+      console.log('📋 Email params:', { ...emailParams, message: '[truncated]' });
       
       // Send email with retry logic
       const success = await this.sendEmailWithRetry(emailParams);
+      console.log('📬 Email send result:', success);
       
       if (success) {
+        console.log('✅ Email sent successfully, updating database...');
+        
         // Log successful email attempt
         await this.logEmailAttempt(customerData.id, customerData.email, 'sent');
+        console.log('📝 Email log entry created');
 
         // Update customer record with email status
-        await supabase
-          .from('customers')
-          .update({
-            welcome_email_sent: true,
-            welcome_email_sent_at: new Date().toISOString(),
-          })
-          .eq('id', customerData.id);
+        try {
+          const { error: updateError } = await supabase
+            .from('customers')
+            .update({
+              welcome_email_sent: true,
+              welcome_email_sent_at: new Date().toISOString(),
+            })
+            .eq('id', customerData.id);
+
+          if (updateError) {
+            console.error('❌ Failed to update customer email status:', updateError);
+            
+            // Check if it's a column not found error
+            if (updateError.message?.includes('welcome_email_sent')) {
+              console.warn('⚠️ Email tracking columns not found in database. Please run the database migration.');
+              console.warn('📋 Run ADD_EMAIL_COLUMNS.sql in your Supabase dashboard');
+            }
+            // Still return true since email was sent successfully
+          } else {
+            console.log('✅ Customer record updated with email status');
+          }
+        } catch (dbError) {
+          console.error('❌ Database update error:', dbError);
+          // Still return true since email was sent successfully
+        }
 
         return true;
+      } else {
+        console.log('❌ Email sending failed');
+        // Log failed email attempt
+        await this.logEmailAttempt(customerData.id, customerData.email, 'failed', 'Email sending failed');
+        return false;
       }
       
       return false;

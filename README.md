@@ -33,8 +33,8 @@ A modern Customer Relationship Management system built with React, TypeScript, a
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd custodian-sync
+git clone https://github.com/AdharshKokkula/CRM-Pro
+cd CRM-Pro
 ```
 
 2. Install dependencies:

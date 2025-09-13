@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Target, TrendingUp, DollarSign, CheckSquare, Clock, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Users, Target, TrendingUp, DollarSign, CheckSquare, Clock, AlertTriangle, Plus, UserPlus, BarChart3, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { CustomerForm } from '@/components/customers/CustomerForm';
+import { LeadForm } from '@/components/leads/LeadForm';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardStats {
   totalCustomers: number;
@@ -17,6 +23,8 @@ interface DashboardStats {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalCustomers: 0,
     totalLeads: 0,
@@ -28,6 +36,8 @@ export default function Dashboard() {
     taskCompletionRate: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [leadDialogOpen, setLeadDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -93,6 +103,102 @@ export default function Dashboard() {
       currency: 'USD',
     }).format(value);
   };
+
+  const handleCustomerSaved = () => {
+    setCustomerDialogOpen(false);
+    fetchDashboardStats();
+    toast({
+      title: 'Success',
+      description: 'Customer added successfully',
+    });
+  };
+
+  const handleLeadSaved = () => {
+    setLeadDialogOpen(false);
+    fetchDashboardStats();
+    toast({
+      title: 'Success',
+      description: 'Lead created successfully',
+    });
+  };
+
+  const handleExportData = async () => {
+    try {
+      // Export customers data as CSV
+      const { data: customers } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('owner_id', user?.id);
+
+      if (customers && customers.length > 0) {
+        const csvContent = [
+          ['Name', 'Email', 'Phone', 'Company', 'Created At'].join(','),
+          ...customers.map(customer => [
+            customer.name,
+            customer.email,
+            customer.phone || '',
+            customer.company || '',
+            new Date(customer.created_at).toLocaleDateString()
+          ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `customers-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        toast({
+          title: 'Success',
+          description: 'Customer data exported successfully',
+        });
+      } else {
+        toast({
+          title: 'Info',
+          description: 'No customer data to export',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to export data',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const quickActions = [
+    {
+      title: 'Add New Customer',
+      description: 'Create a new customer record',
+      icon: UserPlus,
+      action: () => setCustomerDialogOpen(true),
+      color: 'text-blue-600',
+    },
+    {
+      title: 'Create Lead',
+      description: 'Add a new sales opportunity',
+      icon: Plus,
+      action: () => setLeadDialogOpen(true),
+      color: 'text-green-600',
+    },
+    {
+      title: 'View Analytics',
+      description: 'Check performance metrics',
+      icon: BarChart3,
+      action: () => navigate('/analytics'),
+      color: 'text-purple-600',
+    },
+    {
+      title: 'Export Data',
+      description: 'Download customer data',
+      icon: Download,
+      action: handleExportData,
+      color: 'text-orange-600',
+    },
+  ];
 
   const statsCards = [
     {
@@ -223,16 +329,44 @@ export default function Dashboard() {
               Common tasks to get you started
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-sm">
-              <p className="font-medium">• Add a new customer</p>
-              <p className="font-medium">• Create a lead</p>
-              <p className="font-medium">• View analytics</p>
-              <p className="font-medium">• Export data</p>
-            </div>
+          <CardContent className="space-y-3">
+            {quickActions.map((action) => (
+              <Button
+                key={action.title}
+                variant="ghost"
+                className="w-full justify-start h-auto p-3 hover:bg-muted"
+                onClick={action.action}
+              >
+                <action.icon className={`h-4 w-4 mr-3 ${action.color}`} />
+                <div className="text-left">
+                  <div className="font-medium text-sm">{action.title}</div>
+                  <div className="text-xs text-muted-foreground">{action.description}</div>
+                </div>
+              </Button>
+            ))}
           </CardContent>
         </Card>
       </div>
+
+      {/* Customer Dialog */}
+      <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Customer</DialogTitle>
+          </DialogHeader>
+          <CustomerForm onSaved={handleCustomerSaved} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Lead Dialog */}
+      <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New Lead</DialogTitle>
+          </DialogHeader>
+          <LeadForm onSaved={handleLeadSaved} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -18,6 +18,7 @@ import CustomerDashboard from "./pages/customer-portal/CustomerDashboard";
 
 
 import { EmailTestUtils } from "@/utils/emailTest";
+import { DatabaseChecker } from "@/utils/databaseChecker";
 import emailjs from '@emailjs/browser';
 import { emailConfig } from '@/config/email';
 
@@ -34,6 +35,7 @@ if (emailConfig.emailjs.publicKey) {
 
 if (import.meta.env.DEV) {
   EmailTestUtils.logConfigurationStatus();
+  DatabaseChecker.runDatabaseCheck();
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

@@ -73,14 +73,30 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
         // Send welcome email for new customers
         if (sendWelcomeEmail && newCustomer) {
           try {
-            await EmailService.sendWelcomeEmail({
+            console.log('Attempting to send welcome email to:', newCustomer.email);
+            const emailSuccess = await EmailService.sendWelcomeEmail({
               id: newCustomer.id,
               name: newCustomer.name,
               email: newCustomer.email,
             });
+            
+            if (emailSuccess) {
+              console.log('Welcome email sent successfully');
+            } else {
+              console.warn('Welcome email failed to send');
+              toast({
+                title: 'Warning',
+                description: 'Customer created but welcome email failed to send',
+                variant: 'destructive',
+              });
+            }
           } catch (emailError) {
             console.error('Welcome email failed:', emailError);
-            // Don't block customer creation if email fails
+            toast({
+              title: 'Warning', 
+              description: 'Customer created but welcome email failed to send',
+              variant: 'destructive',
+            });
           }
         }
       }
