@@ -12,7 +12,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verify": "node scripts/verify-build.cjs"
+    "verify": "node scripts/verify-build.cjs",
+    "setup-vercel": "node scripts/setup-vercel-env.cjs"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

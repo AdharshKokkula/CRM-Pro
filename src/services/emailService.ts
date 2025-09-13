@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import emailjs from '@emailjs/browser';
 import { emailConfig } from '@/config/email';
-import { PasswordSetupService } from './passwordSetupService';
+import { config } from '@/config/environment';
 
 interface EmailData {
   to: string;
@@ -157,7 +157,7 @@ export class EmailService {
       console.log('✅ Email service is configured');
 
       // Always send direct portal link - password setup will be handled in the portal
-      const setupLink = `${window.location.origin}/customer-portal/login?email=${encodeURIComponent(customerData.email)}`;
+      const setupLink = `${config.appUrl}/customer-portal/login?email=${encodeURIComponent(customerData.email)}`;
       const needsPasswordSetup = false;
       
       const emailParams: EmailParams = {
